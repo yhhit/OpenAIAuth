@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/acheong08/OpenAIAuth/auth"
+	"github.com/xqdoo00o/OpenAIAuth/auth"
 )
 
 func main() {
@@ -26,7 +26,6 @@ func main() {
 		println("Error: " + err.Details)
 		println("Location: " + err.Location)
 		println("Status code: " + fmt.Sprint(err.StatusCode))
-		println("Embedded error: " + err.Error.Error())
 		return
 	}
 	token, err := auth.GetAccessToken()
@@ -34,7 +33,6 @@ func main() {
 		println("Error: " + err.Details)
 		println("Location: " + err.Location)
 		println("Status code: " + fmt.Sprint(err.StatusCode))
-		println("Embedded error: " + err.Error.Error())
 		return
 	}
 	fmt.Println(token)
