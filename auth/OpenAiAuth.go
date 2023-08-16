@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	http "github.com/bogdanfinn/fhttp"
@@ -25,6 +27,10 @@ func NewError(location string, statusCode int, details string) *Error {
 		Details:    details,
 	}
 }
+
+type AccountCookies map[string][]*http.Cookie
+
+var allCookies AccountCookies
 
 type Result struct {
 	AccessToken string `json:"access_token"`
@@ -363,6 +369,63 @@ func (userLogin *UserLogin) GetPUID() (string, *Error) {
 	}
 	// If cookie not found, return error
 	return "", NewError("get_puid", 0, "PUID cookie not found")
+}
+
+func init() {
+	allCookies = AccountCookies{}
+	file, err := os.Open("cookies.json")
+	if err != nil {
+		return
+	}
+	defer file.Close()
+	decoder := json.NewDecoder(file)
+	err = decoder.Decode(&allCookies)
+	if err != nil {
+		return
+	}
+}
+
+func (userLogin *UserLogin) ResetCookies() {
+	userLogin.client.SetCookieJar(tls_client.NewCookieJar())
+}
+
+func (userLogin *UserLogin) SaveCookies() *Error {
+	u, _ := url.Parse("https://chat.openai.com")
+	cookies := userLogin.client.GetCookieJar().Cookies(u)
+	file, err := os.OpenFile("cookies.json", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return NewError("saveCookie", 0, err.Error())
+	}
+	defer file.Close()
+	filtered := []*http.Cookie{}
+	now := time.Now().Unix()
+	for _, cookie := range cookies {
+		if cookie.Expires.Unix() > now {
+			filtered = append(filtered, cookie)
+		}
+	}
+	allCookies[userLogin.Username] = filtered
+	encoder := json.NewEncoder(file)
+	err = encoder.Encode(allCookies)
+	if err != nil {
+		return NewError("saveCookie", 0, err.Error())
+	}
+	return nil
+}
+
+func (userLogin *UserLogin) RenewWithCookies() *Error {
+	cookies := allCookies[userLogin.Username]
+	if len(cookies) == 0 {
+		return NewError("readCookie", 0, "no cookies")
+	}
+	u, _ := url.Parse("https://chat.openai.com")
+	userLogin.client.GetCookieJar().SetCookies(u, cookies)
+	accessToken, statusCode, err := userLogin.GetAccessTokenInternal("")
+	if err != nil {
+		return NewError("renewToken", statusCode, err.Error())
+	}
+	userLogin.Result.AccessToken = accessToken
+	return nil
 }
 
 func (userLogin *UserLogin) GetAuthResult() Result {

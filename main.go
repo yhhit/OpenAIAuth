@@ -15,7 +15,6 @@ func main() {
 		println("Error: " + err.Details)
 		println("Location: " + err.Location)
 		println("Status code: " + fmt.Sprint(err.StatusCode))
-		println("Embedded error: " + err.Error.Error())
 		return
 	}
 	// if os.Getenv("PROXY") != "" {
@@ -24,7 +23,6 @@ func main() {
 		println("Error: " + err.Details)
 		println("Location: " + err.Location)
 		println("Status code: " + fmt.Sprint(err.StatusCode))
-		println("Embedded error: " + err.Error.Error())
 		return
 	}
 	// }
