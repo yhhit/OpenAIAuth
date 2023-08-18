@@ -398,9 +398,9 @@ func (userLogin *UserLogin) SaveCookies() *Error {
 	}
 	defer file.Close()
 	filtered := []*http.Cookie{}
-	now := time.Now().Unix()
+	expireTime := time.Now().AddDate(0, 0, 7).Unix()
 	for _, cookie := range cookies {
-		if cookie.Expires.Unix() > now {
+		if cookie.Expires.Unix() > expireTime {
 			filtered = append(filtered, cookie)
 		}
 	}
