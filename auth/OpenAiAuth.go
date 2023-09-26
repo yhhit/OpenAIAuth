@@ -12,6 +12,8 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	http "github.com/bogdanfinn/fhttp"
 	tls_client "github.com/bogdanfinn/tls-client"
+
+	arkose "github.com/xqdoo00o/funcaptcha"
 )
 
 type Error struct {
@@ -168,6 +170,19 @@ func (userLogin *UserLogin) CheckUsername(state string, username string) (int, e
 	return http.StatusOK, nil
 }
 
+func (userLogin *UserLogin) setArkose() (int, error) {
+	token, err := arkose.GetOpenAIAuthToken("", userLogin.client.GetProxy())
+	if err == nil {
+		u, _ := url.Parse("https://openai.com")
+		cookies := userLogin.client.GetCookieJar().Cookies(u)
+		userLogin.client.GetCookieJar().SetCookies(u, append(cookies, &http.Cookie{Name: "arkoseToken", Value: token}))
+		return http.StatusOK, nil
+	} else {
+		println("Error getting auth Arkose token")
+		return http.StatusInternalServerError, err
+	}
+}
+
 //goland:noinspection GoUnhandledErrorResult,GoErrorStringFormat
 func (userLogin *UserLogin) CheckPassword(state string, username string, password string) (string, int, error) {
 	formParams := url.Values{
@@ -262,7 +277,8 @@ func (userLogin *UserLogin) GetAccessTokenInternal(code string) (string, int, er
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", 0, err
 	}
-
+	u, err := url.Parse("https://openai.com")
+	fmt.Println(userLogin.client.GetCookieJar().Cookies(u))
 	// Check if access token in data
 	if _, ok := result["accessToken"]; !ok {
 		result_string := fmt.Sprintf("%v", result)
@@ -318,6 +334,12 @@ func (userLogin *UserLogin) GetToken() (int, string, string) {
 
 	// check username
 	statusCode, err = userLogin.CheckUsername(state, userLogin.Username)
+	if err != nil {
+		return statusCode, err.Error(), ""
+	}
+
+	// set arkose captcha
+	statusCode, err = userLogin.setArkose()
 	if err != nil {
 		return statusCode, err.Error(), ""
 	}

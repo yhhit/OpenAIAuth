@@ -14,6 +14,7 @@ require (
 	github.com/bogdanfinn/utls v1.5.16 // indirect
 	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/tam7t/hpkp v0.0.0-20160821193359-2b70b4024ed5 // indirect
+	github.com/xqdoo00o/funcaptcha v0.0.0-20230926045956-5e6ae501ae55 // indirect
 	golang.org/x/crypto v0.12.0 // indirect
 	golang.org/x/net v0.14.0 // indirect
 	golang.org/x/sys v0.11.0 // indirect
