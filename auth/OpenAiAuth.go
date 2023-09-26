@@ -174,7 +174,7 @@ func (userLogin *UserLogin) setArkose() (int, error) {
 	token, err := arkose.GetOpenAIAuthToken("", userLogin.client.GetProxy())
 	if err == nil {
 		u, _ := url.Parse("https://openai.com")
-		cookies := userLogin.client.GetCookieJar().Cookies(u)
+		cookies := []*http.Cookie{}
 		userLogin.client.GetCookieJar().SetCookies(u, append(cookies, &http.Cookie{Name: "arkoseToken", Value: token}))
 		return http.StatusOK, nil
 	} else {
@@ -277,8 +277,6 @@ func (userLogin *UserLogin) GetAccessTokenInternal(code string) (string, int, er
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", 0, err
 	}
-	u, err := url.Parse("https://openai.com")
-	fmt.Println(userLogin.client.GetCookieJar().Cookies(u))
 	// Check if access token in data
 	if _, ok := result["accessToken"]; !ok {
 		result_string := fmt.Sprintf("%v", result)
