@@ -36,8 +36,9 @@ type AccountCookies map[string][]*http.Cookie
 var allCookies AccountCookies
 
 type Result struct {
-	AccessToken string `json:"access_token"`
-	PUID        string `json:"puid"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	PUID         string `json:"puid"`
 }
 
 const (
@@ -255,13 +256,29 @@ func (userLogin *UserLogin) CheckPassword(state string, username string, passwor
 	return "", resp.StatusCode, nil
 }
 
+func extractCookieValue(req *http.Request) (string, bool) {
+	// 获取请求中的所有 Cookies
+	cookies := req.Cookies()
+
+	// 遍历 Cookies 查找特定的 Cookie
+	for _, cookie := range cookies {
+		if cookie.Name == "__Secure-next-auth.session-token" {
+			// 返回找到的 Cookie 的值和 true 表示找到了
+			return cookie.Value, true
+		}
+	}
+
+	// 如果没有找到，返回空字符串和 false
+	return "", false
+}
+
 //goland:noinspection GoUnhandledErrorResult,GoErrorStringFormat,GoUnusedParameter
-func (userLogin *UserLogin) GetAccessTokenInternal(code string) (string, int, error) {
+func (userLogin *UserLogin) GetAccessTokenInternal(code string) (string, string, int, error) {
 	req, err := http.NewRequest(http.MethodGet, authSessionUrl, nil)
 	req.Header.Set("User-Agent", UserAgent)
 	resp, err := userLogin.client.Do(req)
 	if err != nil {
-		return "", http.StatusInternalServerError, err
+		return "", "", http.StatusInternalServerError, err
 	}
 
 	defer resp.Body.Close()
@@ -269,39 +286,42 @@ func (userLogin *UserLogin) GetAccessTokenInternal(code string) (string, int, er
 		if resp.StatusCode == http.StatusTooManyRequests {
 			responseMap := make(map[string]string)
 			json.NewDecoder(resp.Body).Decode(&responseMap)
-			return "", resp.StatusCode, errors.New(responseMap["detail"])
+			return "", "", resp.StatusCode, errors.New(responseMap["detail"])
 		}
 
-		return "", resp.StatusCode, errors.New(GetAccessTokenErrorMessage)
+		return "", "", resp.StatusCode, errors.New(GetAccessTokenErrorMessage)
 	}
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", 0, err
+		return "", "", 0, err
 	}
 	// Check if access token in data
 	if _, ok := result["accessToken"]; !ok {
 		result_string := fmt.Sprintf("%v", result)
-		return result_string, 0, errors.New("missing access token")
+		return result_string, "", 0, errors.New("missing access token")
 	}
-	return result["accessToken"].(string), http.StatusOK, nil
+	refreshToken, _ := extractCookieValue(req)
+
+	return result["accessToken"].(string), refreshToken, http.StatusOK, nil
 }
 
 func (userLogin *UserLogin) Begin() *Error {
-	_, err, token := userLogin.GetToken()
+	_, err, accessToken,RefreshToken := userLogin.GetToken()
 	if err != "" {
 		return NewError("begin", 0, err)
 	}
-	userLogin.Result.AccessToken = token
+	userLogin.Result.AccessToken = accessToken
+	userLogin.Result.RefreshToken = RefreshToken
 	return nil
 }
 
-func (userLogin *UserLogin) GetToken() (int, string, string) {
+func (userLogin *UserLogin) GetToken() (int, string, string, string) {
 	// get csrf token
 	req, _ := http.NewRequest(http.MethodGet, csrfUrl, nil)
 	req.Header.Set("User-Agent", UserAgent)
 	resp, err := userLogin.client.Do(req)
 	if err != nil {
-		return http.StatusInternalServerError, err.Error(), ""
+		return http.StatusInternalServerError, err.Error(), "", ""
 	}
 
 	defer resp.Body.Close()
@@ -310,11 +330,11 @@ func (userLogin *UserLogin) GetToken() (int, string, string) {
 			doc, _ := goquery.NewDocumentFromReader(resp.Body)
 			alert := doc.Find(".message").Text()
 			if alert != "" {
-				return resp.StatusCode, strings.TrimSpace(alert), ""
+				return resp.StatusCode, strings.TrimSpace(alert), "", ""
 			}
 		}
 
-		return resp.StatusCode, getCsrfTokenErrorMessage, ""
+		return resp.StatusCode, getCsrfTokenErrorMessage, "", ""
 	}
 
 	// get authorized url
@@ -322,44 +342,48 @@ func (userLogin *UserLogin) GetToken() (int, string, string) {
 	json.NewDecoder(resp.Body).Decode(&responseMap)
 	authorizedUrl, statusCode, err := userLogin.GetAuthorizedUrl(responseMap["csrfToken"])
 	if err != nil {
-		return statusCode, err.Error(), ""
+		return statusCode, err.Error(), "", ""
 	}
 
 	// get state
 	state, statusCode, err := userLogin.GetState(authorizedUrl)
 	if err != nil {
-		return statusCode, err.Error(), ""
+		return statusCode, err.Error(), "", ""
 	}
 
 	// check username
 	statusCode, err = userLogin.CheckUsername(state, userLogin.Username)
 	if err != nil {
-		return statusCode, err.Error(), ""
+		return statusCode, err.Error(), "", ""
 	}
 
 	// set arkose captcha
 	statusCode, err = userLogin.setArkose()
 	if err != nil {
-		return statusCode, err.Error(), ""
+		return statusCode, err.Error(), "", ""
 	}
 
 	// check password
 	_, statusCode, err = userLogin.CheckPassword(state, userLogin.Username, userLogin.Password)
 	if err != nil {
-		return statusCode, err.Error(), ""
+		return statusCode, err.Error(), "", ""
 	}
 
 	// get access token
-	accessToken, statusCode, err := userLogin.GetAccessTokenInternal("")
+	accessToken, refreshToken, statusCode, err := userLogin.GetAccessTokenInternal("")
 	if err != nil {
-		return statusCode, err.Error(), ""
+		return statusCode, err.Error(), "", ""
 	}
 
-	return http.StatusOK, "", accessToken
+	return http.StatusOK, "", accessToken, refreshToken
 }
 
 func (userLogin *UserLogin) GetAccessToken() string {
 	return userLogin.Result.AccessToken
+}
+
+func (userLogin *UserLogin) GetRefreshToken() string {
+	return userLogin.Result.RefreshToken
 }
 
 func (userLogin *UserLogin) GetPUID() (string, *Error) {
@@ -441,11 +465,12 @@ func (userLogin *UserLogin) RenewWithCookies() *Error {
 	}
 	u, _ := url.Parse("https://chat.openai.com")
 	userLogin.client.GetCookieJar().SetCookies(u, cookies)
-	accessToken, statusCode, err := userLogin.GetAccessTokenInternal("")
+	accessToken, refreshToken, statusCode, err := userLogin.GetAccessTokenInternal("")
 	if err != nil {
 		return NewError("renewToken", statusCode, err.Error())
 	}
 	userLogin.Result.AccessToken = accessToken
+	userLogin.Result.RefreshToken = refreshToken
 	return nil
 }
 
