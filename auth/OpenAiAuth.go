@@ -14,7 +14,7 @@ import (
 	tls_client "github.com/bogdanfinn/tls-client"
 	"github.com/bogdanfinn/tls-client/profiles"
 
-	arkose "github.com/xqdoo00o/funcaptcha"
+	arkose "github.com/yhhit/funcaptcha"
 )
 
 type Error struct {
@@ -306,7 +306,7 @@ func (userLogin *UserLogin) GetAccessTokenInternal(code string) (string, string,
 }
 
 func (userLogin *UserLogin) Begin() *Error {
-	_, err, accessToken,RefreshToken := userLogin.GetToken()
+	_, err, accessToken, RefreshToken := userLogin.GetToken()
 	if err != "" {
 		return NewError("begin", 0, err)
 	}
