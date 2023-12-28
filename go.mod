@@ -6,7 +6,6 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/bogdanfinn/fhttp v0.5.27
 	github.com/bogdanfinn/tls-client v1.7.2
-	github.com/yhhit/funcaptcha v0.0.0-20231227161438-67b420ce4117
 )
 
 require (
@@ -17,6 +16,7 @@ require (
 	github.com/klauspost/compress v1.17.4 // indirect
 	github.com/quic-go/quic-go v0.40.1 // indirect
 	github.com/tam7t/hpkp v0.0.0-20160821193359-2b70b4024ed5 // indirect
+	github.com/yhhit/funcaptcha v0.0.0-20231228115515-c2106e18d9ea // indirect
 	golang.org/x/crypto v0.17.0 // indirect
 	golang.org/x/net v0.19.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect
