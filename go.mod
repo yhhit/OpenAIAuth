@@ -6,13 +6,14 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/bogdanfinn/fhttp v0.5.24
 	github.com/bogdanfinn/tls-client v1.6.1
-	github.com/xqdoo00o/funcaptcha v0.0.0-20240119125440-13927300884f
+	github.com/xqdoo00o/funcaptcha v0.0.0-20240229151808-f73bef32f529
 )
 
 require (
 	github.com/andybalholm/brotli v1.0.5 // indirect
 	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/bogdanfinn/utls v1.5.16 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.17.0 // indirect
 	github.com/tam7t/hpkp v0.0.0-20160821193359-2b70b4024ed5 // indirect
 	golang.org/x/crypto v0.13.0 // indirect
