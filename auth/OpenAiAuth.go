@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
 	http "github.com/bogdanfinn/fhttp"
 	tls_client "github.com/bogdanfinn/tls-client"
 	"github.com/bogdanfinn/tls-client/profiles"
@@ -157,7 +156,8 @@ func (userLogin *UserLogin) CheckUsername(authorizedUrl string, username string)
 
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusFound {
-		req, _ := http.NewRequest(http.MethodGet, Auth0Url+resp.Header.Get("Location"), nil)
+		redir := resp.Header.Get("Location")
+		req, _ := http.NewRequest(http.MethodGet, Auth0Url+redir, nil)
 		req.Header.Set("User-Agent", UserAgent)
 		req.Header.Set("Referer", "https://auth.openai.com/")
 		resp, err := userLogin.client.Do(req)
@@ -165,8 +165,8 @@ func (userLogin *UserLogin) CheckUsername(authorizedUrl string, username string)
 			return "", http.StatusInternalServerError, err
 		}
 		defer resp.Body.Close()
-		doc, _ := goquery.NewDocumentFromReader(resp.Body)
-		state, _ := doc.Find("input[name=state]").Attr("value")
+		u, _ := url.Parse(redir)
+		state := u.Query().Get("state")
 		return state, http.StatusOK, nil
 	} else {
 		return "", http.StatusInternalServerError, err
@@ -204,12 +204,6 @@ func (userLogin *UserLogin) CheckPassword(state string, username string, passwor
 
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusBadRequest {
-		doc, _ := goquery.NewDocumentFromReader(resp.Body)
-		alert := doc.Find("#prompt-alert").Text()
-		if alert != "" {
-			return "", resp.StatusCode, errors.New(strings.TrimSpace(alert))
-		}
-
 		return "", resp.StatusCode, errors.New(EmailOrPasswordInvalidErrorMessage)
 	}
 
@@ -307,14 +301,6 @@ func (userLogin *UserLogin) GetToken() (int, string, string) {
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusForbidden {
-			doc, _ := goquery.NewDocumentFromReader(resp.Body)
-			alert := doc.Find(".message").Text()
-			if alert != "" {
-				return resp.StatusCode, strings.TrimSpace(alert), ""
-			}
-		}
-
 		return resp.StatusCode, getCsrfTokenErrorMessage, ""
 	}
 

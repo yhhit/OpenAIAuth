@@ -3,7 +3,6 @@ module github.com/xqdoo00o/OpenAIAuth
 go 1.20
 
 require (
-	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/bogdanfinn/fhttp v0.5.24
 	github.com/bogdanfinn/tls-client v1.6.1
 	github.com/xqdoo00o/funcaptcha v0.0.0-20240313153914-4ab805804232
@@ -11,7 +10,6 @@ require (
 
 require (
 	github.com/andybalholm/brotli v1.0.5 // indirect
-	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/bogdanfinn/utls v1.5.16 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.17.0 // indirect
