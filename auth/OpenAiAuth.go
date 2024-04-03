@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -140,7 +142,7 @@ func (userLogin *UserLogin) GetState(authorizedUrl string) (int, error) {
 }
 
 //goland:noinspection GoUnhandledErrorResult,GoErrorStringFormat
-func (userLogin *UserLogin) CheckUsername(authorizedUrl string, username string) (string, int, error) {
+func (userLogin *UserLogin) CheckUsername(authorizedUrl string, username string) (string, string, int, error) {
 	u, _ := url.Parse(authorizedUrl)
 	query := u.Query()
 	query.Del("prompt")
@@ -151,7 +153,7 @@ func (userLogin *UserLogin) CheckUsername(authorizedUrl string, username string)
 	userLogin.client.SetFollowRedirect(false)
 	resp, err := userLogin.client.Do(req)
 	if err != nil {
-		return "", http.StatusInternalServerError, err
+		return "", "", http.StatusInternalServerError, err
 	}
 
 	defer resp.Body.Close()
@@ -162,19 +164,30 @@ func (userLogin *UserLogin) CheckUsername(authorizedUrl string, username string)
 		req.Header.Set("Referer", "https://auth.openai.com/")
 		resp, err := userLogin.client.Do(req)
 		if err != nil {
-			return "", http.StatusInternalServerError, err
+			return "", "", http.StatusInternalServerError, err
 		}
 		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", "", http.StatusInternalServerError, err
+		}
+		println(string(body))
+		var dx string
+		re := regexp.MustCompile(`blob: "([^"]+?)"`)
+		matches := re.FindStringSubmatch(string(body))
+		if len(matches) > 1 {
+			dx = matches[1]
+		}
 		u, _ := url.Parse(redir)
 		state := u.Query().Get("state")
-		return state, http.StatusOK, nil
+		return state, dx, http.StatusOK, nil
 	} else {
-		return "", http.StatusInternalServerError, err
+		return "", "", http.StatusInternalServerError, err
 	}
 }
 
-func (userLogin *UserLogin) setArkose() (int, error) {
-	token, err := arkose.GetOpenAIAuthToken("", userLogin.client.GetProxy())
+func (userLogin *UserLogin) setArkose(dx string) (int, error) {
+	token, err := arkose.GetOpenAIAuthToken("", dx, userLogin.client.GetProxy())
 	if err == nil {
 		u, _ := url.Parse("https://openai.com")
 		cookies := []*http.Cookie{}
@@ -319,13 +332,13 @@ func (userLogin *UserLogin) GetToken() (int, string, string) {
 	}
 
 	// check username
-	state, statusCode, err := userLogin.CheckUsername(authorizedUrl, userLogin.Username)
+	state, dx, statusCode, err := userLogin.CheckUsername(authorizedUrl, userLogin.Username)
 	if err != nil {
 		return statusCode, err.Error(), ""
 	}
 
 	// set arkose captcha
-	statusCode, err = userLogin.setArkose()
+	statusCode, err = userLogin.setArkose(dx)
 	if err != nil {
 		return statusCode, err.Error(), ""
 	}
