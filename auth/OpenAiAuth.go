@@ -171,7 +171,6 @@ func (userLogin *UserLogin) CheckUsername(authorizedUrl string, username string)
 		if err != nil {
 			return "", "", http.StatusInternalServerError, err
 		}
-		println(string(body))
 		var dx string
 		re := regexp.MustCompile(`blob: "([^"]+?)"`)
 		matches := re.FindStringSubmatch(string(body))
