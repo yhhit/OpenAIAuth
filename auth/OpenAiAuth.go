@@ -39,6 +39,7 @@ var allCookies AccountCookies
 type Result struct {
 	AccessToken string `json:"access_token"`
 	PUID        string `json:"puid"`
+	TeamUserID  string `json:"team_uid,omitempty"`
 }
 
 const (
@@ -389,6 +390,41 @@ func (userLogin *UserLogin) GetPUID() (string, *Error) {
 	}
 	// If cookie not found, return error
 	return "", NewError("get_puid", 0, "PUID cookie not found")
+}
+
+type UserID struct {
+	AccountOrdering []string `json:"account_ordering"`
+}
+
+func (userLogin *UserLogin) GetTeamUserID() (string, *Error) {
+	// Check if user has access token
+	if userLogin.Result.AccessToken == "" {
+		return "", NewError("get_teamuserid", 0, "Missing access token")
+	}
+	req, _ := http.NewRequest("GET", "https://chat.openai.com/backend-api/accounts/check/v4-2023-04-27", nil)
+	// Add headers
+	req.Header.Add("Authorization", "Bearer "+userLogin.Result.AccessToken)
+	req.Header.Add("User-Agent", UserAgent)
+
+	resp, err := userLogin.client.Do(req)
+	if err != nil {
+		return "", NewError("get_teamuserid", 0, "Failed to make request")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", NewError("get_teamuserid", resp.StatusCode, "Failed to make request")
+	}
+	var userId UserID
+	err = json.NewDecoder(resp.Body).Decode(&userId)
+	if err != nil {
+		return "", NewError("get_teamuserid", 0, "teamuserid not found")
+	}
+	if len(userId.AccountOrdering) > 1 {
+		userLogin.Result.TeamUserID = userId.AccountOrdering[0]
+		return userId.AccountOrdering[0], nil
+	}
+	// If cookie not found, return error
+	return "", NewError("get_teamuserid", 0, "teamuserid not found")
 }
 
 func init() {
