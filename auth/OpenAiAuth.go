@@ -333,14 +333,6 @@ func (userLogin *UserLogin) GetToken() (int, string, string, string) {
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusForbidden {
-			doc, _ := goquery.NewDocumentFromReader(resp.Body)
-			alert := doc.Find(".message").Text()
-			if alert != "" {
-				return resp.StatusCode, strings.TrimSpace(alert), "", ""
-			}
-		}
-
 		return resp.StatusCode, getCsrfTokenErrorMessage, "", ""
 	}
 
