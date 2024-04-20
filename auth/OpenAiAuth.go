@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
 	http "github.com/bogdanfinn/fhttp"
 	tls_client "github.com/bogdanfinn/tls-client"
 	"github.com/bogdanfinn/tls-client/profiles"
@@ -46,7 +47,7 @@ const (
 	AuthorizationHeader                = "Authorization"
 	XAuthorizationHeader               = "X-Authorization"
 	ContentType                        = "application/x-www-form-urlencoded"
-	UserAgent                          = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
+	UserAgent                          = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 	Auth0Url                           = "https://auth0.openai.com"
 	LoginUsernameUrl                   = Auth0Url + "/u/login/identifier?state="
 	LoginPasswordUrl                   = Auth0Url + "/u/login/password?state="
@@ -60,7 +61,7 @@ const (
 	defaultTimeoutSeconds              = 600 // 10 minutes
 
 	csrfUrl                  = "https://chat.openai.com/api/auth/csrf"
-	promptLoginUrl           = "https://chat.openai.com/api/auth/signin/auth0?prompt=login"
+	promptLoginUrl           = "https://chat.openai.com/api/auth/signin/login-web?prompt=login"
 	getCsrfTokenErrorMessage = "Failed to get CSRF token."
 	authSessionUrl           = "https://chat.openai.com/api/auth/session"
 )
@@ -86,6 +87,7 @@ func NewHttpClient(proxyUrl string) tls_client.HttpClient {
 func getHttpClient() tls_client.HttpClient {
 	client, _ := tls_client.NewHttpClient(tls_client.NewNoopLogger(), []tls_client.HttpClientOption{
 		tls_client.WithCookieJar(tls_client.NewCookieJar()),
+		tls_client.WithTimeoutSeconds(600),
 		tls_client.WithClientProfile(profiles.Okhttp4Android13),
 	}...)
 	return client
@@ -126,54 +128,66 @@ func (userLogin *UserLogin) GetAuthorizedUrl(csrfToken string) (string, int, err
 }
 
 //goland:noinspection GoUnhandledErrorResult,GoErrorStringFormat
-func (userLogin *UserLogin) GetState(authorizedUrl string) (string, int, error) {
+func (userLogin *UserLogin) GetState(authorizedUrl string) (int, error) {
 	req, err := http.NewRequest(http.MethodGet, authorizedUrl, nil)
-	req.Header.Set("Content-Type", ContentType)
-	req.Header.Set("User-Agent", UserAgent)
-	resp, err := userLogin.client.Do(req)
-	if err != nil {
-		return "", http.StatusInternalServerError, err
-	}
-
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", resp.StatusCode, errors.New(GetStateErrorMessage)
-	}
-
-	doc, _ := goquery.NewDocumentFromReader(resp.Body)
-	state, _ := doc.Find("input[name=state]").Attr("value")
-	return state, http.StatusOK, nil
-}
-
-//goland:noinspection GoUnhandledErrorResult,GoErrorStringFormat
-func (userLogin *UserLogin) CheckUsername(state string, username string) (int, error) {
-	formParams := url.Values{
-		"state":                       {state},
-		"username":                    {username},
-		"js-available":                {"true"},
-		"webauthn-available":          {"true"},
-		"is-brave":                    {"false"},
-		"webauthn-platform-available": {"false"},
-		"action":                      {"default"},
-	}
-	req, _ := http.NewRequest(http.MethodPost, LoginUsernameUrl+state, strings.NewReader(formParams.Encode()))
-	req.Header.Set("Content-Type", ContentType)
 	req.Header.Set("User-Agent", UserAgent)
 	resp, err := userLogin.client.Do(req)
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
-
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return resp.StatusCode, errors.New(EmailInvalidErrorMessage)
+		return resp.StatusCode, errors.New(GetStateErrorMessage)
 	}
-
 	return http.StatusOK, nil
 }
 
-func (userLogin *UserLogin) setArkose() (int, error) {
-	token, err := arkose.GetOpenAIAuthToken("", userLogin.client.GetProxy())
+//goland:noinspection GoUnhandledErrorResult,GoErrorStringFormat
+func (userLogin *UserLogin) CheckUsername(authorizedUrl string, username string) (string, string, int, error) {
+	u, _ := url.Parse(authorizedUrl)
+	query := u.Query()
+	query.Del("prompt")
+	query.Set("login_hint", username)
+	req, _ := http.NewRequest(http.MethodGet, Auth0Url+"/authorize?"+query.Encode(), nil)
+	req.Header.Set("User-Agent", UserAgent)
+	req.Header.Set("Referer", "https://auth.openai.com/")
+	userLogin.client.SetFollowRedirect(false)
+	resp, err := userLogin.client.Do(req)
+	if err != nil {
+		return "", "", http.StatusInternalServerError, err
+	}
+
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusFound {
+		redir := resp.Header.Get("Location")
+		req, _ := http.NewRequest(http.MethodGet, Auth0Url+redir, nil)
+		req.Header.Set("User-Agent", UserAgent)
+		req.Header.Set("Referer", "https://auth.openai.com/")
+		resp, err := userLogin.client.Do(req)
+		if err != nil {
+			return "", "", http.StatusInternalServerError, err
+		}
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", "", http.StatusInternalServerError, err
+		}
+		var dx string
+		re := regexp.MustCompile(`blob: "([^"]+?)"`)
+		matches := re.FindStringSubmatch(string(body))
+		if len(matches) > 1 {
+			dx = matches[1]
+		}
+		u, _ := url.Parse(redir)
+		state := u.Query().Get("state")
+		return state, dx, http.StatusOK, nil
+	} else {
+		return "", "", http.StatusInternalServerError, err
+	}
+}
+
+func (userLogin *UserLogin) setArkose(dx string) (int, error) {
+	token, err := arkose.GetOpenAIAuthToken("", dx, userLogin.client.GetProxy())
 	if err == nil {
 		u, _ := url.Parse("https://openai.com")
 		cookies := []*http.Cookie{}
@@ -191,7 +205,6 @@ func (userLogin *UserLogin) CheckPassword(state string, username string, passwor
 		"state":    {state},
 		"username": {username},
 		"password": {password},
-		"action":   {"default"},
 	}
 	req, err := http.NewRequest(http.MethodPost, LoginPasswordUrl+state, strings.NewReader(formParams.Encode()))
 	req.Header.Set("Content-Type", ContentType)
@@ -204,12 +217,6 @@ func (userLogin *UserLogin) CheckPassword(state string, username string, passwor
 
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusBadRequest {
-		doc, _ := goquery.NewDocumentFromReader(resp.Body)
-		alert := doc.Find("#prompt-alert").Text()
-		if alert != "" {
-			return "", resp.StatusCode, errors.New(strings.TrimSpace(alert))
-		}
-
 		return "", resp.StatusCode, errors.New(EmailOrPasswordInvalidErrorMessage)
 	}
 
@@ -346,19 +353,19 @@ func (userLogin *UserLogin) GetToken() (int, string, string, string) {
 	}
 
 	// get state
-	state, statusCode, err := userLogin.GetState(authorizedUrl)
+	statusCode, err = userLogin.GetState(authorizedUrl)
 	if err != nil {
 		return statusCode, err.Error(), "", ""
 	}
 
 	// check username
-	statusCode, err = userLogin.CheckUsername(state, userLogin.Username)
+	state, dx, statusCode, err := userLogin.CheckUsername(authorizedUrl, userLogin.Username)
 	if err != nil {
 		return statusCode, err.Error(), "", ""
 	}
 
 	// set arkose captcha
-	statusCode, err = userLogin.setArkose()
+	statusCode, err = userLogin.setArkose(dx)
 	if err != nil {
 		return statusCode, err.Error(), "", ""
 	}
