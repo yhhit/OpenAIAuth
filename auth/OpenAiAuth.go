@@ -37,9 +37,10 @@ type AccountCookies map[string][]*http.Cookie
 var allCookies AccountCookies
 
 type Result struct {
-	AccessToken string `json:"access_token"`
-	PUID        string `json:"puid"`
-	TeamUserID  string `json:"team_uid,omitempty"`
+	AccessToken  string `json:"access_token"`
+	PUID         string `json:"puid"`
+	RefreshToken string `json:"refresh_token"`
+	TeamUserID   string `json:"team_uid,omitempty"`
 }
 
 const (
