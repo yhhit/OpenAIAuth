@@ -103,6 +103,16 @@ func NewAuthenticator(emailAddress, password, proxy string) *UserLogin {
 	return userLogin
 }
 
+func NewAuthenticatorWithResult(emailAddress, password, proxy string, result Result) *UserLogin {
+	userLogin := &UserLogin{
+		Username: emailAddress,
+		Password: password,
+		client:   NewHttpClient(proxy),
+		Result:   result,
+	}
+	return userLogin
+}
+
 //goland:noinspection GoUnhandledErrorResult,GoErrorStringFormat
 func (userLogin *UserLogin) GetAuthorizedUrl(csrfToken string) (string, int, error) {
 	form := url.Values{
