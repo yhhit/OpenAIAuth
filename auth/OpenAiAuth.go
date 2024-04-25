@@ -308,18 +308,18 @@ func (userLogin *UserLogin) GetAccessTokenInternal(code string) (string, string,
 		result_string := fmt.Sprintf("%v", result)
 		return result_string, "", 0, errors.New("missing access token")
 	}
-	refreshToken, _ := extractCookieValue(req)
+	SessionToken, _ := extractCookieValue(req)
 
-	return result["accessToken"].(string), refreshToken, http.StatusOK, nil
+	return result["accessToken"].(string), SessionToken, http.StatusOK, nil
 }
 
 func (userLogin *UserLogin) Begin() *Error {
-	_, err, accessToken, RefreshToken := userLogin.GetToken()
+	_, err, accessToken, SessionToken := userLogin.GetToken()
 	if err != "" {
 		return NewError("begin", 0, err)
 	}
 	userLogin.Result.AccessToken = accessToken
-	userLogin.Result.SessionToken = RefreshToken
+	userLogin.Result.SessionToken = SessionToken
 	return nil
 }
 
@@ -370,12 +370,12 @@ func (userLogin *UserLogin) GetToken() (int, string, string, string) {
 	}
 
 	// get access token
-	accessToken, refreshToken, statusCode, err := userLogin.GetAccessTokenInternal("")
+	accessToken, SessionToken, statusCode, err := userLogin.GetAccessTokenInternal("")
 	if err != nil {
 		return statusCode, err.Error(), "", ""
 	}
 
-	return http.StatusOK, "", accessToken, refreshToken
+	return http.StatusOK, "", accessToken, SessionToken
 }
 
 func (userLogin *UserLogin) GetAccessToken() string {
@@ -500,12 +500,12 @@ func (userLogin *UserLogin) RenewWithCookies() *Error {
 	}
 	u, _ := url.Parse("https://chat.openai.com")
 	userLogin.client.GetCookieJar().SetCookies(u, cookies)
-	accessToken, refreshToken, statusCode, err := userLogin.GetAccessTokenInternal("")
+	accessToken, SessionToken, statusCode, err := userLogin.GetAccessTokenInternal("")
 	if err != nil {
 		return NewError("renewToken", statusCode, err.Error())
 	}
 	userLogin.Result.AccessToken = accessToken
-	userLogin.Result.SessionToken = refreshToken
+	userLogin.Result.SessionToken = SessionToken
 	return nil
 }
 
