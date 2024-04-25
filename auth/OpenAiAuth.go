@@ -426,8 +426,15 @@ func (userLogin *UserLogin) GetPUID() (string, *Error) {
 	return "", NewError("get_puid", 0, "PUID cookie not found")
 }
 
+type AccountInfo struct {
+	Account struct {
+		AccountId   string `json:"account_id"`
+		PlanType    string `json:"plan_type"`
+		Deactivated bool   `json:"is_deactivated"`
+	} `json:"account"`
+}
 type UserID struct {
-	AccountOrdering []string `json:"account_ordering"`
+	Accounts map[string]AccountInfo `json:"accounts"`
 }
 
 func (userLogin *UserLogin) GetTeamUserID() (string, *Error) {
@@ -453,9 +460,11 @@ func (userLogin *UserLogin) GetTeamUserID() (string, *Error) {
 	if err != nil {
 		return "", NewError("get_teamuserid", 0, "teamuserid not found")
 	}
-	if len(userId.AccountOrdering) > 1 {
-		userLogin.Result.TeamUserID = userId.AccountOrdering[0]
-		return userId.AccountOrdering[0], nil
+	for _, item := range userId.Accounts {
+		if item.Account.PlanType == "team" && !item.Account.Deactivated {
+			userLogin.Result.TeamUserID = item.Account.AccountId
+			return item.Account.AccountId, nil
+		}
 	}
 	// If cookie not found, return error
 	return "", NewError("get_teamuserid", 0, "teamuserid not found")
