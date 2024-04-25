@@ -39,7 +39,7 @@ var allCookies AccountCookies
 type Result struct {
 	AccessToken  string `json:"access_token"`
 	PUID         string `json:"puid"`
-	RefreshToken string `json:"refresh_token"`
+	SessionToken string `json:"session_token"`
 	TeamUserID   string `json:"team_uid,omitempty"`
 }
 
@@ -319,7 +319,7 @@ func (userLogin *UserLogin) Begin() *Error {
 		return NewError("begin", 0, err)
 	}
 	userLogin.Result.AccessToken = accessToken
-	userLogin.Result.RefreshToken = RefreshToken
+	userLogin.Result.SessionToken = RefreshToken
 	return nil
 }
 
@@ -382,8 +382,8 @@ func (userLogin *UserLogin) GetAccessToken() string {
 	return userLogin.Result.AccessToken
 }
 
-func (userLogin *UserLogin) GetRefreshToken() string {
-	return userLogin.Result.RefreshToken
+func (userLogin *UserLogin) GetSessionToken() string {
+	return userLogin.Result.SessionToken
 }
 
 func (userLogin *UserLogin) GetPUID() (string, *Error) {
@@ -505,7 +505,7 @@ func (userLogin *UserLogin) RenewWithCookies() *Error {
 		return NewError("renewToken", statusCode, err.Error())
 	}
 	userLogin.Result.AccessToken = accessToken
-	userLogin.Result.RefreshToken = refreshToken
+	userLogin.Result.SessionToken = refreshToken
 	return nil
 }
 
