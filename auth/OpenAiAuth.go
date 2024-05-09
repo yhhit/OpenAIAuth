@@ -50,7 +50,6 @@ const (
 	ContentType                        = "application/x-www-form-urlencoded"
 	UserAgent                          = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 	Auth0Url                           = "https://auth0.openai.com"
-	LoginUsernameUrl                   = Auth0Url + "/u/login/identifier?state="
 	LoginPasswordUrl                   = Auth0Url + "/u/login/password?state="
 	ParseUserInfoErrorMessage          = "Failed to parse user login info."
 	GetAuthorizedUrlErrorMessage       = "Failed to get authorized url."
@@ -61,11 +60,13 @@ const (
 	GetArkoseTokenErrorMessage         = "Failed to get arkose token."
 	defaultTimeoutSeconds              = 600 // 10 minutes
 
-	csrfUrl                  = "https://chat.openai.com/api/auth/csrf"
-	promptLoginUrl           = "https://chat.openai.com/api/auth/signin/login-web?prompt=login"
+	csrfUrl                  = "https://chatgpt.com/api/auth/csrf"
+	promptLoginUrl           = "https://chatgpt.com/api/auth/signin/login-web?prompt=login&screen_hint=login"
 	getCsrfTokenErrorMessage = "Failed to get CSRF token."
-	authSessionUrl           = "https://chat.openai.com/api/auth/session"
+	authSessionUrl           = "https://chatgpt.com/api/auth/session"
 )
+
+var u, _ = url.Parse("https://chatgpt.com")
 
 type UserLogin struct {
 	Username string
@@ -401,8 +402,8 @@ func (userLogin *UserLogin) GetPUID() (string, *Error) {
 	if userLogin.Result.AccessToken == "" {
 		return "", NewError("get_puid", 0, "Missing access token")
 	}
-	// Make request to https://chat.openai.com/backend-api/models
-	req, _ := http.NewRequest("GET", "https://chat.openai.com/backend-api/models?history_and_training_disabled=false", nil)
+	// Make request to https://chatgpt.com/backend-api/models
+	req, _ := http.NewRequest("GET", "https://chatgpt.com/backend-api/models?history_and_training_disabled=false", nil)
 	// Add headers
 	req.Header.Add("Authorization", "Bearer "+userLogin.Result.AccessToken)
 	req.Header.Add("User-Agent", UserAgent)
@@ -442,7 +443,7 @@ func (userLogin *UserLogin) GetTeamUserID() (string, *Error) {
 	if userLogin.Result.AccessToken == "" {
 		return "", NewError("get_teamuserid", 0, "Missing access token")
 	}
-	req, _ := http.NewRequest("GET", "https://chat.openai.com/backend-api/accounts/check/v4-2023-04-27", nil)
+	req, _ := http.NewRequest("GET", "https://chatgpt.com/backend-api/accounts/check/v4-2023-04-27", nil)
 	// Add headers
 	req.Header.Add("Authorization", "Bearer "+userLogin.Result.AccessToken)
 	req.Header.Add("User-Agent", UserAgent)
@@ -485,11 +486,15 @@ func init() {
 }
 
 func (userLogin *UserLogin) ResetCookies() {
-	userLogin.client.SetCookieJar(tls_client.NewCookieJar())
+	newCookies := tls_client.NewCookieJar()
+	newCookies.SetCookies(u, []*http.Cookie{{
+		Name:  "oai-dm-tgt-c-240329",
+		Value: "2024-04-02",
+	}})
+	userLogin.client.SetCookieJar(newCookies)
 }
 
 func (userLogin *UserLogin) SaveCookies() *Error {
-	u, _ := url.Parse("https://chat.openai.com")
 	cookies := userLogin.client.GetCookieJar().Cookies(u)
 	file, err := os.OpenFile("cookies.json", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
@@ -517,7 +522,10 @@ func (userLogin *UserLogin) RenewWithCookies() *Error {
 	if len(cookies) == 0 {
 		return NewError("readCookie", 0, "no cookies")
 	}
-	u, _ := url.Parse("https://chat.openai.com")
+	cookies = append(cookies, &http.Cookie{
+		Name:  "oai-dm-tgt-c-240329",
+		Value: "2024-04-02",
+	})
 	userLogin.client.GetCookieJar().SetCookies(u, cookies)
 	accessToken, SessionToken, statusCode, err := userLogin.GetAccessTokenInternal("")
 	if err != nil {
