@@ -61,12 +61,13 @@ const (
 	defaultTimeoutSeconds              = 600 // 10 minutes
 
 	csrfUrl                  = "https://chatgpt.com/api/auth/csrf"
-	promptLoginUrl           = "https://chatgpt.com/api/auth/signin/login-web?prompt=login&screen_hint=login"
+	promptLoginUrl           = "https://chatgpt.com/api/auth/signin/login-web?prompt=login&screen_hint=login&ext-statsig-tier=production&ext-oai-did="
 	getCsrfTokenErrorMessage = "Failed to get CSRF token."
 	authSessionUrl           = "https://chatgpt.com/api/auth/session"
 )
 
 var u, _ = url.Parse("https://chatgpt.com")
+var tempDID string
 
 type UserLogin struct {
 	Username string
@@ -121,7 +122,7 @@ func (userLogin *UserLogin) GetAuthorizedUrl(csrfToken string) (string, int, err
 		"csrfToken":   {csrfToken},
 		"json":        {"true"},
 	}
-	req, err := http.NewRequest(http.MethodPost, promptLoginUrl, strings.NewReader(form.Encode()))
+	req, err := http.NewRequest(http.MethodPost, promptLoginUrl+tempDID, strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", ContentType)
 	req.Header.Set("User-Agent", UserAgent)
 	resp, err := userLogin.client.Do(req)
@@ -143,6 +144,7 @@ func (userLogin *UserLogin) GetAuthorizedUrl(csrfToken string) (string, int, err
 func (userLogin *UserLogin) GetState(authorizedUrl string) (int, error) {
 	req, err := http.NewRequest(http.MethodGet, authorizedUrl, nil)
 	req.Header.Set("User-Agent", UserAgent)
+	req.Header.Set("Referer", "https://chatgpt.com/")
 	resp, err := userLogin.client.Do(req)
 	if err != nil {
 		return http.StatusInternalServerError, err
@@ -486,10 +488,12 @@ func init() {
 }
 
 func (userLogin *UserLogin) ResetCookies() {
+	tempDID = uuid.NewString()
 	newCookies := tls_client.NewCookieJar()
 	newCookies.SetCookies(u, []*http.Cookie{{
-		Name:  "oai-dm-tgt-c-240329",
-		Value: "2024-04-02",
+		Name:    "oai-did",
+		Value:   tempDID,
+		Expires: time.Now().Add(time.Hour * 24 * 365),
 	}})
 	userLogin.client.SetCookieJar(newCookies)
 }
@@ -510,6 +514,7 @@ func (userLogin *UserLogin) SaveCookies() *Error {
 	}
 	allCookies[userLogin.Username] = filtered
 	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
 	err = encoder.Encode(allCookies)
 	if err != nil {
 		return NewError("saveCookie", 0, err.Error())
@@ -522,10 +527,6 @@ func (userLogin *UserLogin) RenewWithCookies() *Error {
 	if len(cookies) == 0 {
 		return NewError("readCookie", 0, "no cookies")
 	}
-	cookies = append(cookies, &http.Cookie{
-		Name:  "oai-dm-tgt-c-240329",
-		Value: "2024-04-02",
-	})
 	userLogin.client.GetCookieJar().SetCookies(u, cookies)
 	accessToken, SessionToken, statusCode, err := userLogin.GetAccessTokenInternal("")
 	if err != nil {
