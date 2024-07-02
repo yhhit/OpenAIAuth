@@ -8,7 +8,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/bogdanfinn/fhttp v0.5.28
 	github.com/bogdanfinn/tls-client v1.7.5
-	github.com/yhhit/funcaptcha v0.0.0-20240509041727-b5c75fbbc146
+	github.com/yhhit/funcaptcha v0.0.0-20240702090343-b62573cb1971
 )
 
 require (

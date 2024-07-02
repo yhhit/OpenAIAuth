@@ -49,6 +49,8 @@ github.com/yhhit/funcaptcha v0.0.0-20240420015417-9cfa661ce10c h1:qV+zfDd4Yctlf7
 github.com/yhhit/funcaptcha v0.0.0-20240420015417-9cfa661ce10c/go.mod h1:fTvA8JMPfCBuSZ5Orw+Xr4sMBw1AKCLxaSVfaQZx0Ls=
 github.com/yhhit/funcaptcha v0.0.0-20240509041727-b5c75fbbc146 h1:GGmazZWF03Cw7RMeNoo5LriAsNsRNb/x+FSCgtuG2Rk=
 github.com/yhhit/funcaptcha v0.0.0-20240509041727-b5c75fbbc146/go.mod h1:xw2L4u+8J3Bdb/K2MJQgXtbz9ZeggXGt/rTCfCMQ/Og=
+github.com/yhhit/funcaptcha v0.0.0-20240702090343-b62573cb1971 h1:P7ZtbXZw2JLSj/EVEYmWrepR4E8MeMssM1X+NtQnBI8=
+github.com/yhhit/funcaptcha v0.0.0-20240702090343-b62573cb1971/go.mod h1:xw2L4u+8J3Bdb/K2MJQgXtbz9ZeggXGt/rTCfCMQ/Og=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20210921155107-089bfa567519/go.mod h1:GvvjBRRGRdwPK5ydBHafDWAxML/pGHZbMvKqRZ5+Abc=
