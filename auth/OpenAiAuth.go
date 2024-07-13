@@ -35,7 +35,7 @@ func NewError(location string, statusCode int, details string) *Error {
 
 type AccountCookies map[string][]*http.Cookie
 
-var allCookies AccountCookies``
+var allCookies AccountCookies
 
 type Result struct {
 	AccessToken  string `json:"access_token"`
